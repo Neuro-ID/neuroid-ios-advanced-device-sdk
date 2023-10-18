@@ -6,7 +6,7 @@ Pod::Spec.new do |s|
     
     s.name = "NeuroIDAdvancedDevice"
     s.module_name = "NeuroIDAdvancedDevice"
-    s.summary = "NeuroID's SDK for its Advanced Device tracking."
+    s.summary = "NeuroID's SDK for Advanced Device Tracking."
     s.requires_arc = true
     s.version = "1.0.0"
     s.author = { "NeuroID" => "NeuroID" }
