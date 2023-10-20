@@ -13,34 +13,15 @@ struct NIDResponse: Codable {
 }
 
 public class NeuroIDADV: NSObject {
-    public static func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
-        self.getAPIKey(apiKey) { result in
+    public static func getAdvancedDeviceSignal(
+        _ apiKey: String,
+        completion: @escaping (Result<String, Error>) -> Void
+    ) {
+        getAPIKey(apiKey) { result in
             switch result {
             case .success(let fAPiKey):
-                let client = FingerprintProFactory.getInstance(fAPiKey)
-                if #available(iOS 12.0, *) {
-                    client.getVisitorIdResponse { result in
-                        switch result {
-                        case .success(let fResponse):
-                            completion(.success(fResponse.requestId))
-                        case .failure(let error):
-                            completion(.failure(NSError(
-                                domain: "NeuroIDAdvancedDevice",
-                                code: 4,
-                                userInfo: [
-                                    NSLocalizedDescriptionKey: error.localizedDescription,
-                                ]
-                            )))
-                        }
-                    }
-                } else {
-                    completion(.failure(NSError(
-                        domain: "NeuroIDAdvancedDevice",
-                        code: 5,
-                        userInfo: [
-                            NSLocalizedDescriptionKey: "Method not available",
-                        ]
-                    )))
+                retryAPICall(apiKey: fAPiKey, maxRetries: 3, delay: 2) { result in
+                    completion(result)
                 }
             case .failure(let error):
                 completion(.failure(error))
@@ -48,12 +29,32 @@ public class NeuroIDADV: NSObject {
         }
     }
 
-    internal static func getAPIKey(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
+    internal static func getAPIKey(
+        _ apiKey: String,
+        completion: @escaping (Result<String, Error>) -> Void
+    ) {
         let apiURL = URL(string: "https://receiver.neuro-id.com/a/\(apiKey)")!
-        let task = URLSession.shared.dataTask(with: apiURL) { data, _, error in
+        let task = URLSession.shared.dataTask(with: apiURL) { data, response, error in
             if let error = error {
                 completion(.failure(error))
                 return
+            }
+
+            if let httpResponse = response as? HTTPURLResponse {
+                if httpResponse.statusCode == 403 {
+                    completion(
+                        .failure(
+                            NSError(
+                                domain: "NeuroIDAdvancedDevice",
+                                code: 1,
+                                userInfo: [
+                                    NSLocalizedDescriptionKey: "403",
+                                ]
+                            )
+                        )
+                    )
+                    return
+                }
             }
 
             guard let data = data else {
@@ -61,7 +62,7 @@ public class NeuroIDADV: NSObject {
                     .failure(
                         NSError(
                             domain: "NeuroIDAdvancedDevice",
-                            code: 1,
+                            code: 2,
                             userInfo: [
                                 NSLocalizedDescriptionKey: "No data received",
                             ]
@@ -83,7 +84,7 @@ public class NeuroIDADV: NSObject {
                             .failure(
                                 NSError(
                                     domain: "NeuroIDAdvancedDevice",
-                                    code: 2,
+                                    code: 3,
                                     userInfo: [
                                         NSLocalizedDescriptionKey: "Unable to convert to string",
                                     ]
@@ -96,7 +97,7 @@ public class NeuroIDADV: NSObject {
                         .failure(
                             NSError(
                                 domain: "NeuroIDAdvancedDevice",
-                                code: 3,
+                                code: 4,
                                 userInfo: [
                                     NSLocalizedDescriptionKey: "Error retrieving data",
                                 ]
@@ -108,7 +109,69 @@ public class NeuroIDADV: NSObject {
                 completion(.failure(error))
             }
         }
-
+        // ADD LOG EVENT IF 403
         task.resume()
+    }
+
+    internal static func getRequestID(
+        _ apiKey: String,
+        completion: @escaping (Result<String, Error>) -> Void
+    ) {
+        let client = FingerprintProFactory.getInstance(apiKey)
+        if #available(iOS 12.0, *) {
+            client.getVisitorIdResponse { result in
+                switch result {
+                case .success(let fResponse):
+                    completion(.success(fResponse.requestId))
+                case .failure(let error):
+                    completion(.failure(NSError(
+                        domain: "NeuroIDAdvancedDevice",
+                        code: 6,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: error.localizedDescription,
+                        ]
+                    )))
+                }
+            }
+        } else {
+            completion(.failure(NSError(
+                domain: "NeuroIDAdvancedDevice",
+                code: 7,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Method not available",
+                ]
+            )))
+        }
+    }
+
+    internal static func retryAPICall(
+        apiKey: String,
+        maxRetries: Int,
+        delay: TimeInterval,
+        completion: @escaping (Result<String, Error>) -> Void
+    ) {
+        var currentRetry = 0
+
+        func attemptAPICall() {
+            getRequestID(apiKey) { result in
+
+                if case .failure(let error) = result {
+                    if error.localizedDescription.contains("Method not available") {
+                        completion(.failure(error))
+                    } else if currentRetry < maxRetries {
+                        currentRetry += 1
+                        DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
+                            attemptAPICall()
+                        }
+                    } else {
+                        completion(.failure(error))
+                    }
+                } else if case .success(let value) = result {
+                    completion(.success(value))
+                }
+            }
+        }
+
+        attemptAPICall()
     }
 }
