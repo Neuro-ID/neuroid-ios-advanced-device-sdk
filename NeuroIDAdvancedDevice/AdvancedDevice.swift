@@ -109,7 +109,6 @@ public class NeuroIDADV: NSObject {
                 completion(.failure(error))
             }
         }
-        // ADD LOG EVENT IF 403
         task.resume()
     }
 
