@@ -12,7 +12,7 @@ Pod::Spec.new do |s|
     s.author = { "NeuroID" => "NeuroID" }
     s.homepage = "https://neuro-id.com/"
     
-    s.source = { :git => "https://github.com/Neuro-ID/neuroid-ios-advanced-device-sdk", :tag => "v#{s.version}"}
+    s.source = { :git => "https://github.com/Neuro-ID/neuroid-ios-advanced-device-sdk.git", :tag => "v#{s.version}"}
     s.source_files = "NeuroIDAdvancedDevice/**/*.{h,swift}"
 
     s.dependency 'FingerprintPro', '~> 2.0'
