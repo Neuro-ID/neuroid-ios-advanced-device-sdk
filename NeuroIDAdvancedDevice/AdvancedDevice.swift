@@ -33,7 +33,7 @@ public class NeuroIDADV: NSObject {
         _ apiKey: String,
         completion: @escaping (Result<String, Error>) -> Void
     ) {
-        let apiURL = URL(string: "https://receiver.neuro-id.com/a/\(apiKey)")!
+        let apiURL = URL(string: "https://receiver.neuroid.cloud/a/\(apiKey)")!
         let task = URLSession.shared.dataTask(with: apiURL) { data, response, error in
             if let error = error {
                 completion(.failure(error))
