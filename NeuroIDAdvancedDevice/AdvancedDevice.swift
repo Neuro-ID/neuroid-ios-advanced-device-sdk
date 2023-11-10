@@ -116,7 +116,7 @@ public class NeuroIDADV: NSObject {
         _ apiKey: String,
         completion: @escaping (Result<String, Error>) -> Void
     ) {
-        let region: Region = .custom(domain: "https://advanced.neuro-id.com/")
+        let region: Region = .custom(domain: "https://advanced.neuro-id.com")
         let configuration = Configuration(apiKey: apiKey, region: region)
         let client = FingerprintProFactory.getInstance(configuration)
         if #available(iOS 12.0, *) {
