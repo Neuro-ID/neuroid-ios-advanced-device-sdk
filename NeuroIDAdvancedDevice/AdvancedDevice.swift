@@ -12,22 +12,25 @@ struct NIDResponse: Codable {
     let key: String
 }
 
-public class NeuroIDADV: NSObject {
-    public static func getAdvancedDeviceSignal(
-        _ apiKey: String,
-        completion: @escaping (Result<String, Error>) -> Void
-    ) {
-        getAPIKey(apiKey) { result in
-            switch result {
-            case .success(let fAPiKey):
-                retryAPICall(apiKey: fAPiKey, maxRetries: 3, delay: 2) { result in
-                    completion(result)
-                }
-            case .failure(let error):
-                completion(.failure(error))
-            }
-        }
-    }
+/** Interface that allows for testing */
+protocol DeviceSignalService {
+    func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void)
+}
+
+public class NeuroIDADV: NSObject, DeviceSignalService {
+    
+    public func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
+        NeuroIDADV.getAPIKey(apiKey) { result in
+               switch result {
+               case .success(let fAPiKey):
+                   NeuroIDADV.retryAPICall(apiKey: fAPiKey, maxRetries: 3, delay: 2) { result in
+                       completion(result)
+                   }
+               case .failure(let error):
+                   completion(.failure(error))
+               }
+           }
+       }
 
     internal static func getAPIKey(
         _ apiKey: String,
