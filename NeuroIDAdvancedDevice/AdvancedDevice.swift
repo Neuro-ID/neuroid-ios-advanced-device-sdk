@@ -18,10 +18,9 @@ protocol DeviceSignalService {
 }
 
 public class NeuroIDADV: NSObject, DeviceSignalService {
-    public static let shared = NeuroIDADV()
     
     public func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
-           NeuroIDADV.getAPIKey(apiKey) { result in
+        NeuroIDADV.getAPIKey(apiKey) { result in
                switch result {
                case .success(let fAPiKey):
                    NeuroIDADV.retryAPICall(apiKey: fAPiKey, maxRetries: 3, delay: 2) { result in
