@@ -13,24 +13,31 @@ struct NIDResponse: Codable {
 }
 
 /** Interface that allows for testing */
-protocol DeviceSignalService {
+public protocol DeviceSignalService {
     func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void)
 }
 
-public class NeuroIDADV: NSObject, DeviceSignalService {
-    
+internal class DeviceSignalServiceImpl: DeviceSignalService {
     public func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
         NeuroIDADV.getAPIKey(apiKey) { result in
-               switch result {
-               case .success(let fAPiKey):
-                   NeuroIDADV.retryAPICall(apiKey: fAPiKey, maxRetries: 3, delay: 2) { result in
-                       completion(result)
-                   }
-               case .failure(let error):
-                   completion(.failure(error))
-               }
-           }
-       }
+            switch result {
+            case .success(let fAPiKey):
+                NeuroIDADV.retryAPICall(apiKey: fAPiKey, maxRetries: 3, delay: 2) { result in
+                    completion(result)
+                }
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+}
+
+public class NeuroIDADV: NSObject, DeviceSignalService {
+    internal static var deviceSignalService: DeviceSignalService = DeviceSignalServiceImpl()
+
+    public func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
+        NeuroIDADV.deviceSignalService.getAdvancedDeviceSignal(apiKey, completion: completion)
+   }
 
     internal static func getAPIKey(
         _ apiKey: String,
