@@ -17,7 +17,8 @@ public protocol DeviceSignalService {
     func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void)
 }
 
-internal class DeviceSignalServiceImpl: DeviceSignalService {
+public class NeuroIDADV: NSObject, DeviceSignalService {
+    
     public func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
         NeuroIDADV.getAPIKey(apiKey) { result in
             switch result {
@@ -30,14 +31,6 @@ internal class DeviceSignalServiceImpl: DeviceSignalService {
             }
         }
     }
-}
-
-public class NeuroIDADV: NSObject, DeviceSignalService {
-    internal static var deviceSignalService: DeviceSignalService = DeviceSignalServiceImpl()
-
-    public func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
-        NeuroIDADV.deviceSignalService.getAdvancedDeviceSignal(apiKey, completion: completion)
-   }
 
     internal static func getAPIKey(
         _ apiKey: String,
