@@ -14,17 +14,22 @@ struct NIDResponse: Codable {
 
 /** Interface that allows for testing */
 public protocol DeviceSignalService {
-    func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void)
+    func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<(String, Double), Error>) -> Void)
 }
 
 public class NeuroIDADV: NSObject, DeviceSignalService {
     
-    public func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
+    public func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<(String, Double), Error>) -> Void) {
         NeuroIDADV.getAPIKey(apiKey) { result in
             switch result {
             case .success(let fAPiKey):
                 NeuroIDADV.retryAPICall(apiKey: fAPiKey, maxRetries: 3, delay: 2) { result in
-                    completion(result)
+                    switch result {
+                    case .success(let (value, duration)):
+                        completion(.success((value, duration)))
+                    case .failure(let error):
+                        completion(.failure(error))
+                    }
                 }
             case .failure(let error):
                 completion(.failure(error))
@@ -152,13 +157,14 @@ public class NeuroIDADV: NSObject, DeviceSignalService {
         apiKey: String,
         maxRetries: Int,
         delay: TimeInterval,
-        completion: @escaping (Result<String, Error>) -> Void
+        completion: @escaping (Result<(String, TimeInterval), Error>) -> Void
     ) {
         var currentRetry = 0
 
         func attemptAPICall() {
-            getRequestID(apiKey) { result in
+            let startTime = Date() 
 
+            getRequestID(apiKey) { result in
                 if case .failure(let error) = result {
                     if error.localizedDescription.contains("Method not available") {
                         completion(.failure(error))
@@ -171,7 +177,8 @@ public class NeuroIDADV: NSObject, DeviceSignalService {
                         completion(.failure(error))
                     }
                 } else if case .success(let value) = result {
-                    completion(.success(value))
+                    let duration = Date().timeIntervalSince(startTime) * 1000
+                    completion(.success((value, duration)))
                 }
             }
         }
