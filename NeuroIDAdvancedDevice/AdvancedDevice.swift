@@ -36,6 +36,24 @@ public class NeuroIDADV: NSObject, DeviceSignalService {
             }
         }
     }
+    
+    public static func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
+          NeuroIDADV.getAPIKey(apiKey) { result in
+              switch result {
+              case .success(let fAPiKey):
+                  NeuroIDADV.retryAPICall(apiKey: fAPiKey, maxRetries: 3, delay: 2) { result in
+                      switch result {
+                      case .success(let (value, _)):
+                          completion(.success(value))
+                      case .failure(let error):
+                          completion(.failure(error))
+                      }
+                  }
+              case .failure(let error):
+                  completion(.failure(error))
+              }
+          }
+      }
 
     internal static func getAPIKey(
         _ apiKey: String,
