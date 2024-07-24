@@ -14,13 +14,17 @@ struct NIDResponse: Codable {
 
 /** Interface that allows for testing */
 public protocol DeviceSignalService {
+    func getAdvancedDeviceSignal(_ apiKey: String, clientID: String?, linkedSiteID: String?, completion: @escaping (Result<(String, Double), Error>) -> Void)
     func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<(String, Double), Error>) -> Void)
 }
 
 public class NeuroIDADV: NSObject, DeviceSignalService {
-    
     public func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<(String, Double), Error>) -> Void) {
-        NeuroIDADV.getAPIKey(apiKey) { result in
+        getAdvancedDeviceSignal(apiKey, clientID: nil, linkedSiteID: nil, completion: completion)
+    }
+
+    public func getAdvancedDeviceSignal(_ apiKey: String, clientID: String?, linkedSiteID: String?, completion: @escaping (Result<(String, Double), Error>) -> Void) {
+        NeuroIDADV.getAPIKey(apiKey, clientID: clientID, linkedSiteID: linkedSiteID) { result in
             switch result {
             case .success(let fAPiKey):
                 NeuroIDADV.retryAPICall(apiKey: fAPiKey, maxRetries: 3, delay: 2) { result in
@@ -36,30 +40,32 @@ public class NeuroIDADV: NSObject, DeviceSignalService {
             }
         }
     }
-    
-    public static func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
-          NeuroIDADV.getAPIKey(apiKey) { result in
-              switch result {
-              case .success(let fAPiKey):
-                  NeuroIDADV.retryAPICall(apiKey: fAPiKey, maxRetries: 3, delay: 2) { result in
-                      switch result {
-                      case .success(let (value, _)):
-                          completion(.success(value))
-                      case .failure(let error):
-                          completion(.failure(error))
-                      }
-                  }
-              case .failure(let error):
-                  completion(.failure(error))
-              }
-          }
-      }
 
-    internal static func getAPIKey(
+    public static func getAdvancedDeviceSignal(_ apiKey: String, completion: @escaping (Result<String, Error>) -> Void) {
+        NeuroIDADV.getAPIKey(apiKey) { result in
+            switch result {
+            case .success(let fAPiKey):
+                NeuroIDADV.retryAPICall(apiKey: fAPiKey, maxRetries: 3, delay: 2) { result in
+                    switch result {
+                    case .success(let (value, _)):
+                        completion(.success(value))
+                    case .failure(let error):
+                        completion(.failure(error))
+                    }
+                }
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+
+    static func getAPIKey(
         _ apiKey: String,
+        clientID: String? = "",
+        linkedSiteID: String? = "",
         completion: @escaping (Result<String, Error>) -> Void
     ) {
-        let apiURL = URL(string: "https://receiver.neuroid.cloud/a/\(apiKey)")!
+        let apiURL = URL(string: "https://receiver.neuroid.cloud/a/\(apiKey)?clientId=\(clientID ?? "")&linkedSiteId=\(linkedSiteID ?? "")")!
         let task = URLSession.shared.dataTask(with: apiURL) { data, response, error in
             if let error = error {
                 completion(.failure(error))
@@ -70,13 +76,16 @@ public class NeuroIDADV: NSObject, DeviceSignalService {
                 if httpResponse.statusCode == 403 {
                     completion(
                         .failure(
-                            NSError(
-                                domain: "NeuroIDAdvancedDevice",
-                                code: 1,
-                                userInfo: [
-                                    NSLocalizedDescriptionKey: "403",
-                                ]
-                            )
+                            createError(code: 1, description: "403")
+                        )
+                    )
+                    return
+                }
+
+                if httpResponse.statusCode == 204 {
+                    completion(
+                        .failure(
+                            createError(code: 8, description: "204")
                         )
                     )
                     return
@@ -86,13 +95,7 @@ public class NeuroIDADV: NSObject, DeviceSignalService {
             guard let data = data else {
                 completion(
                     .failure(
-                        NSError(
-                            domain: "NeuroIDAdvancedDevice",
-                            code: 2,
-                            userInfo: [
-                                NSLocalizedDescriptionKey: "No data received",
-                            ]
-                        )
+                        createError(code: 2, description: "NeuroID API Error: No Data Received")
                     )
                 )
                 return
@@ -108,26 +111,14 @@ public class NeuroIDADV: NSObject, DeviceSignalService {
                     } else {
                         completion(
                             .failure(
-                                NSError(
-                                    domain: "NeuroIDAdvancedDevice",
-                                    code: 3,
-                                    userInfo: [
-                                        NSLocalizedDescriptionKey: "Unable to convert to string",
-                                    ]
-                                )
+                                createError(code: 3, description: "NeuroID API Error: Unable to convert to string")
                             )
                         )
                     }
                 } else {
                     completion(
                         .failure(
-                            NSError(
-                                domain: "NeuroIDAdvancedDevice",
-                                code: 4,
-                                userInfo: [
-                                    NSLocalizedDescriptionKey: "Error retrieving data",
-                                ]
-                            )
+                            createError(code: 4, description: "NeuroID API Error: Error Retrieving Data")
                         )
                     )
                 }
@@ -138,40 +129,36 @@ public class NeuroIDADV: NSObject, DeviceSignalService {
         task.resume()
     }
 
-    internal static func getRequestID(
+    static func getRequestID(
         _ apiKey: String,
         completion: @escaping (Result<String, Error>) -> Void
     ) {
-        let region: Region = .custom(domain: "https://advanced.neuro-id.com")
-        let configuration = Configuration(apiKey: apiKey, region: region)
-        let client = FingerprintProFactory.getInstance(configuration)
         if #available(iOS 12.0, *) {
+            let region: Region = .custom(domain: "https://advanced.neuro-id.com")
+            let configuration = Configuration(apiKey: apiKey, region: region)
+            let client = FingerprintProFactory.getInstance(configuration)
             client.getVisitorIdResponse { result in
                 switch result {
                 case .success(let fResponse):
                     completion(.success(fResponse.requestId))
                 case .failure(let error):
-                    completion(.failure(NSError(
-                        domain: "NeuroIDAdvancedDevice",
-                        code: 6,
-                        userInfo: [
-                            NSLocalizedDescriptionKey: error.localizedDescription,
-                        ]
-                    )))
+                    completion(
+                        .failure(
+                            createError(code: 6, description: "Fingerprint Response Failure (code 6): \(error.localizedDescription)")
+                        )
+                    )
                 }
             }
         } else {
-            completion(.failure(NSError(
-                domain: "NeuroIDAdvancedDevice",
-                code: 7,
-                userInfo: [
-                    NSLocalizedDescriptionKey: "Method not available",
-                ]
-            )))
+            completion(
+                .failure(
+                    createError(code: 7, description: "Fingerprint Response Failure (code 7): Method Not Available")
+                )
+            )
         }
     }
 
-    internal static func retryAPICall(
+    static func retryAPICall(
         apiKey: String,
         maxRetries: Int,
         delay: TimeInterval,
@@ -180,7 +167,7 @@ public class NeuroIDADV: NSObject, DeviceSignalService {
         var currentRetry = 0
 
         func attemptAPICall() {
-            let startTime = Date() 
+            let startTime = Date()
 
             getRequestID(apiKey) { result in
                 if case .failure(let error) = result {
@@ -202,5 +189,15 @@ public class NeuroIDADV: NSObject, DeviceSignalService {
         }
 
         attemptAPICall()
+    }
+
+    static func createError(code: Int, description: String) -> NSError {
+        return NSError(
+            domain: "NeuroIDAdvancedDevice",
+            code: code,
+            userInfo: [
+                NSLocalizedDescriptionKey: description,
+            ]
+        )
     }
 }
